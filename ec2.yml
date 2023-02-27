@@ -1,0 +1,53 @@
+Parameters:
+  Region:
+    Type: String
+    Default: ap-southeast-1
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+
+Resources:
+  MySecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Sub ${EnvironmentName}-MySecurityGroup
+      VpcId: !ImportValue dev-VPCId
+      GroupDescription: My Security Group
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  EC2Instance:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      ImageId: ami-0f2eac25772cd4e36
+      InstanceType: t2.micro
+      KeyName: testjenkis
+      # ... other properties ...
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          GroupSet:
+            - !Ref MySecurityGroup
+          SubnetId: !ImportValue 'MyStack-PublicSubnet1Id'
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y httpd
+          systemctl start httpd
+          systemctl enable httpd
+
+Outputs:
+  EC2InstanceId:
+    Description: "The ID of the EC2 instance"
+    Value: !Ref EC2Instance
+  PublicIp:
+    Description: "The public IP address of the EC2 instance"
+    Value: !GetAtt EC2Instance.PublicIp
